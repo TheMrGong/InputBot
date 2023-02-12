@@ -175,6 +175,20 @@ impl KeybdKey {
             .insert(self, Bind::BlockableBind(Arc::new(callback)));
     }
 
+    pub fn bind_all_blockable<F: Fn(KeybdKey) -> BlockInput + Send + Sync + Clone + 'static>(callback: F) {
+        for btn in KeybdKey::iter() {
+            let callback = callback.clone();
+            let fire = move || {
+                callback(btn)
+            };
+
+            KEYBD_BINDS
+                .lock()
+                .unwrap()
+                .insert(btn, Bind::BlockableBind(Arc::new(fire)));
+        }
+    }
+
     pub fn bind_all<F: Fn(KeybdKey) + Send + Sync + Clone + 'static>(callback: F) {
         for key in KeybdKey::iter() {
             let callback = callback.clone();
@@ -214,6 +228,20 @@ impl MouseButton {
             .lock()
             .unwrap()
             .insert(self, Bind::BlockableBind(Arc::new(callback)));
+    }
+
+    pub fn bind_all_blockable<F: Fn(MouseButton) -> BlockInput + Send + Sync + Clone + 'static>(callback: F) {
+        for btn in MouseButton::iter() {
+            let callback = callback.clone();
+            let fire = move || {
+                callback(btn)
+            };
+
+            MOUSE_BINDS
+                .lock()
+                .unwrap()
+                .insert(btn, Bind::BlockableBind(Arc::new(fire)));
+        }
     }
 
     pub fn bind_all<F: Fn(MouseButton) + Send + Sync + Clone + 'static>(callback: F) {

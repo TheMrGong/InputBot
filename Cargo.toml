@@ -1,6 +1,6 @@
 [package]
 name = "inputbot"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["obv-mikhail <obv.mikhail@gmail.com>"]
 description = "Cross-platform (Windows & Linux) library for simulating keyboard/mouse input events and registering global input device event handlers."
 documentation = "https://docs.rs/inputbot"

@@ -316,7 +316,7 @@ pub fn from_keybd_key(k: KeybdKey) -> Option<char> {
         KeybdKey::CommaKey => Some(','),
         KeybdKey::PeriodKey => Some('.'),
         KeybdKey::MinusKey => Some('-'),
-        KeybdKey::QuoteKey => Some('"'),
+        KeybdKey::QuoteKey => Some('\''),
         KeybdKey::SemicolonKey => Some(';'),
         KeybdKey::LBracketKey => Some('['),
         KeybdKey::RBracketKey => Some(']'),

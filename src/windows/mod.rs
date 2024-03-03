@@ -14,7 +14,8 @@ use winapi::{
 mod inputs;
 
 static KEYBD_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(AtomicPtr::default);
-static MOUSE_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(AtomicPtr::default);
+static MOUSE_BUTTON_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(AtomicPtr::default);
+static MOUSE_WHEEL_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(AtomicPtr::default);
 
 impl KeybdKey {
     /// Returns true if a given `KeybdKey` is currently pressed (in the down position).
@@ -107,8 +108,11 @@ impl MouseWheel {
 
 /// Starts listening for bound input events.
 pub fn handle_input_events() {
-    if !MOUSE_BINDS.lock().unwrap().is_empty() {
-        set_hook(WH_MOUSE_LL, &*MOUSE_HHOOK, mouse_proc);
+    if !MOUSE_BUTTON_BINDS.lock().unwrap().is_empty() {
+        set_hook(WH_MOUSE_LL, &*MOUSE_BUTTON_HHOOK, mouse_proc);
+    };
+    if !MOUSE_WHEEL_BINDS.lock().unwrap().is_empty() {
+        set_hook(WH_MOUSE_LL, &*MOUSE_WHEEL_HHOOK, mouse_wheel_proc);
     };
     if !KEYBD_BINDS.lock().unwrap().is_empty() {
         set_hook(WH_KEYBOARD_LL, &*KEYBD_HHOOK, keybd_proc);
@@ -150,8 +154,8 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 }
 
 unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
-    if MOUSE_BINDS.lock().unwrap().is_empty() {
-        unset_hook(&*MOUSE_HHOOK);
+    if MOUSE_BUTTON_BINDS.lock().unwrap().is_empty() {
+        unset_hook(&*MOUSE_BUTTON_HHOOK);
     } else if let Some(event) = match w_param as u32 {
         WM_LBUTTONDOWN => Some(MouseButton::LeftButton),
         WM_RBUTTONDOWN => Some(MouseButton::RightButton),
@@ -167,7 +171,7 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
         }
         _ => None,
     } {
-        if let Some(bind) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
+        if let Some(bind) = MOUSE_BUTTON_BINDS.lock().unwrap().get_mut(&event) {
             match bind {
                 Bind::NormalBind(cb) => {
                     let cb = Arc::clone(cb);
@@ -185,6 +189,47 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
                 }
             }
         };
+    }
+    CallNextHookEx(null_mut(), code, w_param, l_param)
+}
+
+unsafe extern "system" fn mouse_wheel_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
+    if MOUSE_WHEEL_BINDS.lock().unwrap().is_empty() {
+        unset_hook(&*MOUSE_WHEEL_HHOOK);
+    } else if let Some((event, scroll_amount)) = match w_param as u32 {
+        WM_MOUSEWHEEL | WM_MOUSEHWHEEL => {
+            
+            let llhs = &*(l_param as *const MSLLHOOKSTRUCT);
+            let scroll_amount = (llhs.mouseData >> 16) as i16;
+            Some((if w_param as u32 == WM_MOUSEWHEEL { MouseWheel::Vertical(scroll_amount) } else { MouseWheel::Horizontal(scroll_amount) }, scroll_amount))
+        },
+        _ => None,
+    } {
+        
+        if let Some(bind) = MOUSE_WHEEL_BINDS.lock().unwrap().iter().find_map(|(typ, bind)| {
+            if typ.matches_type(&event) {
+                Some(bind)
+            } else {
+                None
+            }
+        }) {
+            match bind {
+                BindWithI16::NormalBind(cb) => {
+                    let cb = Arc::clone(cb);
+                    spawn(move || cb(scroll_amount));
+                }
+                BindWithI16::BlockBind(cb) => {
+                    let cb = Arc::clone(cb);
+                    spawn(move || cb(scroll_amount));
+                    return 1;
+                }
+                BindWithI16::BlockableBind(cb) => {
+                    if let BlockInput::Block = cb(scroll_amount) {
+                        return 1;
+                    }
+                }
+            }
+        }
     }
     CallNextHookEx(null_mut(), code, w_param, l_param)
 }

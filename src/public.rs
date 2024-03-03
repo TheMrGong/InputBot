@@ -151,7 +151,17 @@ pub enum MouseButton {
 
 pub struct MouseCursor;
 
-pub struct MouseWheel;
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, EnumIter)]
+pub enum MouseWheel {
+    Vertical(i16),
+    Horizontal(i16)
+}
+
+impl MouseWheel {
+    pub fn matches_type(&self, other: &Self) -> bool {
+        return std::mem::discriminant(self) == std::mem::discriminant(other);
+    }
+}
 
 impl KeybdKey {
     pub fn bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
@@ -210,21 +220,21 @@ impl KeybdKey {
 
 impl MouseButton {
     pub fn bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
-        MOUSE_BINDS
+        MOUSE_BUTTON_BINDS
             .lock()
             .unwrap()
             .insert(self, Bind::NormalBind(Arc::new(callback)));
     }
 
     pub fn block_bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
-        MOUSE_BINDS
+        MOUSE_BUTTON_BINDS
             .lock()
             .unwrap()
             .insert(self, Bind::BlockBind(Arc::new(callback)));
     }
 
     pub fn blockable_bind<F: Fn() -> BlockInput + Send + Sync + 'static>(self, callback: F) {
-        MOUSE_BINDS
+        MOUSE_BUTTON_BINDS
             .lock()
             .unwrap()
             .insert(self, Bind::BlockableBind(Arc::new(callback)));
@@ -237,7 +247,7 @@ impl MouseButton {
                 callback(btn)
             };
 
-            MOUSE_BINDS
+            MOUSE_BUTTON_BINDS
                 .lock()
                 .unwrap()
                 .insert(btn, Bind::BlockableBind(Arc::new(fire)));
@@ -251,7 +261,7 @@ impl MouseButton {
                 callback(btn);
             };
 
-            MOUSE_BINDS
+            MOUSE_BUTTON_BINDS
                 .lock()
                 .unwrap()
                 .insert(btn, Bind::NormalBind(Arc::new(fire)));
@@ -259,7 +269,76 @@ impl MouseButton {
     }
 
     pub fn unbind(self) {
-        MOUSE_BINDS.lock().unwrap().remove(&self);
+        MOUSE_BUTTON_BINDS.lock().unwrap().remove(&self);
+    }
+}
+
+impl MouseWheel {
+    pub fn bind<F: Fn(i16) + Send + Sync + 'static>(self, callback: F) {
+        MOUSE_WHEEL_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, BindWithI16::NormalBind(Arc::new(callback)));
+    }
+
+    pub fn block_bind<F: Fn(i16) + Send + Sync + 'static>(self, callback: F) {
+        MOUSE_WHEEL_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, BindWithI16::BlockBind(Arc::new(callback)));
+    }
+
+    pub fn blockable_bind<F: Fn(i16) -> BlockInput + Send + Sync + 'static>(self, callback: F) {
+        MOUSE_WHEEL_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, BindWithI16::BlockableBind(Arc::new(callback)));
+    }
+
+    pub fn bind_all_blockable<F: Fn(MouseWheel) -> BlockInput + Send + Sync + Clone + 'static>(callback: F) {
+        for btn in MouseWheel::iter() { 
+            let callback = callback.clone();
+            let fire = move |val| {
+                match btn {
+                    Self::Horizontal(_) => {
+                        callback(MouseWheel::Horizontal(val))
+                    },
+                    Self::Vertical(_) => {
+                        callback(MouseWheel::Vertical(val))
+                    }
+                }
+            };
+
+            MOUSE_WHEEL_BINDS
+                .lock()
+                .unwrap()
+                .insert(btn, BindWithI16::BlockableBind(Arc::new(fire)));
+        }
+    }
+
+    pub fn bind_all<F: Fn(MouseWheel) + Send + Sync + Clone + 'static>(callback: F) {
+        for btn in MouseWheel::iter() {
+            let callback = callback.clone();
+            let fire = move |val| {
+                match btn {
+                    Self::Horizontal(_) => {
+                        callback(MouseWheel::Horizontal(val))
+                    },
+                    Self::Vertical(_) => {
+                        callback(MouseWheel::Vertical(val))
+                    }
+                }
+            };
+
+            MOUSE_WHEEL_BINDS
+                .lock()
+                .unwrap()
+                .insert(btn, BindWithI16::NormalBind(Arc::new(fire)));
+        }
+    }
+
+    pub fn unbind(self) {
+        MOUSE_WHEEL_BINDS.lock().unwrap().remove(&self);
     }
 }
 

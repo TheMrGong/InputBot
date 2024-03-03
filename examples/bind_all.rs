@@ -1,4 +1,4 @@
-use inputbot::{KeybdKey, MouseButton};
+use inputbot::{KeybdKey, MouseButton, MouseWheel};
 
 /// This example demonstrates binding all of the keyboard keys and mouse buttons to a
 /// simple function. The function prints the key or button name that was pressed.
@@ -14,6 +14,10 @@ fn main() {
 
     // Bind all mouse buttons to a common callback event.
     MouseButton::bind_all(|event| {
+        println!("{:?}", event);
+    });
+
+    MouseWheel::bind_all(|event| {
         println!("{:?}", event);
     });
 

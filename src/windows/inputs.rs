@@ -1,6 +1,7 @@
 use crate::public::{
     KeybdKey::{self, *},
     MouseButton::{self, *},
+    MouseWheel::{self, *}
 };
 
 impl From<KeybdKey> for u64 {

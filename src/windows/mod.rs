@@ -121,34 +121,39 @@ pub fn handle_input_events() {
     unsafe { GetMessageW(&mut msg, 0 as HWND, 0, 0) };
 }
 
+static KEYBD_HELD: Lazy<Mutex<HashMap<u32, bool>>> = Lazy::new(Default::default);
+
 unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
+    let vk_code = (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode;
     if KEYBD_BINDS.lock().unwrap().is_empty() {
         unset_hook(&*KEYBD_HHOOK);
     } else if w_param as u32 == WM_KEYDOWN {
-        if let Some(bind) = KEYBD_BINDS
+        let block = match KEYBD_BINDS
             .lock()
             .unwrap()
-            .get_mut(&KeybdKey::from(u64::from(
-                (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode,
-            )))
+            .get_mut(&KeybdKey::from(u64::from(vk_code)))
         {
-            match bind {
-                Bind::NormalBind(cb) => {
-                    let cb = Arc::clone(cb);
-                    spawn(move || cb());
-                }
-                Bind::BlockBind(cb) => {
-                    let cb = Arc::clone(cb);
-                    spawn(move || cb());
-                    return 1;
-                }
-                Bind::BlockableBind(cb) => {
-                    if let BlockInput::Block = cb() {
-                        return 1;
-                    }
-                }
+            Some(Bind::NormalBind(cb)) => {
+                let cb = Arc::clone(cb);
+                spawn(move || cb());
+                false
             }
+            Some(Bind::BlockBind(cb)) => {
+                let cb = Arc::clone(cb);
+                spawn(move || cb());
+                true
+            }
+            Some(Bind::BlockableBind(cb)) => matches!(cb(), BlockInput::Block),
+            None => false,
+        };
+        *KEYBD_HELD.lock().unwrap().entry(vk_code).or_insert(false) |= !block;
+        if block {
+            return 1;
         }
+    } else if matches!(w_param as u32, WM_KEYUP | WM_SYSKEYUP)
+        && KEYBD_HELD.lock().unwrap().remove(&vk_code) == Some(false)
+    {
+        return 1;
     }
     CallNextHookEx(null_mut(), code, w_param, l_param)
 }

@@ -127,33 +127,36 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
     let vk_code = (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode;
     if KEYBD_BINDS.lock().unwrap().is_empty() {
         unset_hook(&*KEYBD_HHOOK);
-    } else if w_param as u32 == WM_KEYDOWN {
+    } else if matches!(w_param as u32, WM_KEYDOWN | WM_KEYUP | WM_SYSKEYUP) {
+        let down = w_param as u32 == WM_KEYDOWN;
         let block = match KEYBD_BINDS
             .lock()
             .unwrap()
             .get_mut(&KeybdKey::from(u64::from(vk_code)))
         {
-            Some(Bind::NormalBind(cb)) => {
+            Some(BindWithBool::NormalBind(cb)) => {
                 let cb = Arc::clone(cb);
-                spawn(move || cb());
+                spawn(move || cb(down));
                 false
             }
-            Some(Bind::BlockBind(cb)) => {
+            Some(BindWithBool::BlockBind(cb)) => {
                 let cb = Arc::clone(cb);
-                spawn(move || cb());
+                spawn(move || cb(down));
                 true
             }
-            Some(Bind::BlockableBind(cb)) => matches!(cb(), BlockInput::Block),
+            Some(BindWithBool::BlockableBind(cb)) => matches!(cb(down), BlockInput::Block),
             None => false,
         };
-        *KEYBD_HELD.lock().unwrap().entry(vk_code).or_insert(false) |= !block;
+        let block = if down {
+            *KEYBD_HELD.lock().unwrap().entry(vk_code).or_insert(false) |= !block;
+            block
+        } else {
+            let held = KEYBD_HELD.lock().unwrap().remove(&vk_code);
+            block || held == Some(false)
+        };
         if block {
             return 1;
         }
-    } else if matches!(w_param as u32, WM_KEYUP | WM_SYSKEYUP)
-        && KEYBD_HELD.lock().unwrap().remove(&vk_code) == Some(false)
-    {
-        return 1;
     }
     CallNextHookEx(null_mut(), code, w_param, l_param)
 }

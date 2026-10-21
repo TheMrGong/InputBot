@@ -251,16 +251,13 @@ fn handle_input_event(event: Event) {
         Keyboard(KeyboardEvent::Key(keyboard_key_event)) => {
             let key = keyboard_key_event.key();
             if let Some(keybd_key) = scan_code_to_key(key) {
-                if keyboard_key_event.key_state() == KeyState::Pressed {
-                    KEY_STATES.lock().unwrap().insert(keybd_key, true);
+                let down = keyboard_key_event.key_state() == KeyState::Pressed;
+                KEY_STATES.lock().unwrap().insert(keybd_key, down);
 
-                    if let Some(Bind::NormalBind(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key)
-                    {
-                        let cb = Arc::clone(cb);
-                        spawn(move || cb());
-                    }
-                } else {
-                    KEY_STATES.lock().unwrap().insert(keybd_key, false);
+                if let Some(BindWithBool::NormalBind(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key)
+                {
+                    let cb = Arc::clone(cb);
+                    spawn(move || cb(down));
                 }
             }
         }

@@ -12,6 +12,11 @@ pub enum Bind {
     BlockBind(BlockBindHandler),
     BlockableBind(BlockableBindHandler),
 }
+pub enum BindWithBool {
+    NormalBind(BindHandlerBool),
+    BlockBind(BlockBindHandlerBool),
+    BlockableBind(BlockableBindHandlerBool),
+}
 pub enum BindWithI16 {
     NormalBind(BindHandlerI16),
     BlockBind(BlockBindHandlerI16),
@@ -22,10 +27,14 @@ pub type BindHandler = Arc<dyn Fn() + Send + Sync + 'static>;
 pub type BlockBindHandler = Arc<dyn Fn() + Send + Sync + 'static>;
 pub type BlockableBindHandler = Arc<dyn Fn() -> BlockInput + Send + Sync + 'static>;
 
+pub type BindHandlerBool = Arc<dyn Fn(bool) + Send + Sync + 'static>;
+pub type BlockBindHandlerBool = Arc<dyn Fn(bool) + Send + Sync + 'static>;
+pub type BlockableBindHandlerBool = Arc<dyn Fn(bool) -> BlockInput + Send + Sync + 'static>;
+
 pub type BindHandlerI16 = Arc<dyn Fn(i16) + Send + Sync + 'static>;
 pub type BlockBindHandlerI16 = Arc<dyn Fn(i16) + Send + Sync + 'static>;
 pub type BlockableBindHandlerI16 = Arc<dyn Fn(i16) -> BlockInput + Send + Sync + 'static>;
-pub type KeybdBindMap = HashMap<KeybdKey, Bind>;
+pub type KeybdBindMap = HashMap<KeybdKey, BindWithBool>;
 pub type MouseButtonBindMap = HashMap<MouseButton, Bind>;
 pub type MouseWheelBindMap = HashMap<MouseWheel, BindWithI16>;
 

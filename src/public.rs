@@ -165,51 +165,81 @@ impl MouseWheel {
 
 impl KeybdKey {
     pub fn bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
+        self.bind_updown(move |down| {
+            if down {
+                callback()
+            }
+        });
+    }
+
+    pub fn bind_updown<F: Fn(bool) + Send + Sync + 'static>(self, callback: F) {
         KEYBD_BINDS
             .lock()
             .unwrap()
-            .insert(self, Bind::NormalBind(Arc::new(callback)));
+            .insert(self, BindWithBool::NormalBind(Arc::new(callback)));
     }
 
     pub fn block_bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
+        self.block_bind_updown(move |down| {
+            if down {
+                callback()
+            }
+        });
+    }
+
+    pub fn block_bind_updown<F: Fn(bool) + Send + Sync + 'static>(self, callback: F) {
         KEYBD_BINDS
             .lock()
             .unwrap()
-            .insert(self, Bind::BlockBind(Arc::new(callback)));
+            .insert(self, BindWithBool::BlockBind(Arc::new(callback)));
     }
 
     pub fn blockable_bind<F: Fn() -> BlockInput + Send + Sync + 'static>(self, callback: F) {
+        self.blockable_bind_updown(move |down| {
+            if down {
+                callback()
+            } else {
+                BlockInput::DontBlock
+            }
+        });
+    }
+
+    pub fn blockable_bind_updown<F: Fn(bool) -> BlockInput + Send + Sync + 'static>(self, callback: F) {
         KEYBD_BINDS
             .lock()
             .unwrap()
-            .insert(self, Bind::BlockableBind(Arc::new(callback)));
+            .insert(self, BindWithBool::BlockableBind(Arc::new(callback)));
     }
 
     pub fn bind_all_blockable<F: Fn(KeybdKey) -> BlockInput + Send + Sync + Clone + 'static>(callback: F) {
+        Self::bind_all_blockable_updown(move |key, down| {
+            if down {
+                callback(key)
+            } else {
+                BlockInput::DontBlock
+            }
+        });
+    }
+
+    pub fn bind_all_blockable_updown<F: Fn(KeybdKey, bool) -> BlockInput + Send + Sync + Clone + 'static>(callback: F) {
         for btn in KeybdKey::iter() {
             let callback = callback.clone();
-            let fire = move || {
-                callback(btn)
-            };
-
-            KEYBD_BINDS
-                .lock()
-                .unwrap()
-                .insert(btn, Bind::BlockableBind(Arc::new(fire)));
+            btn.blockable_bind_updown(move |down| callback(btn, down));
         }
     }
 
     pub fn bind_all<F: Fn(KeybdKey) + Send + Sync + Clone + 'static>(callback: F) {
+        Self::bind_all_updown(move |key, down| {
+            if down {
+                callback(key)
+            }
+        });
+    }
+
+    pub fn bind_all_updown<F: Fn(KeybdKey, bool) + Send + Sync + Clone + 'static>(callback: F) {
         for key in KeybdKey::iter() {
             let callback = callback.clone();
-            let fire = move || {
-                callback(key);
-            };
-
-            KEYBD_BINDS
-                .lock()
-                .unwrap()
-                .insert(key, Bind::NormalBind(Arc::new(fire)));
+            key.bind_updown(move |down| callback(key, down));
         }
     }
 
@@ -370,6 +400,7 @@ pub fn from_keybd_key(k: KeybdKey) -> Option<char> {
         KeybdKey::XKey => Some('x'),
         KeybdKey::YKey => Some('y'),
         KeybdKey::ZKey => Some('z'),
+        KeybdKey::SpaceKey => Some(' '),
         KeybdKey::Numpad0Key => Some('0'),
         KeybdKey::Numpad1Key => Some('1'),
         KeybdKey::Numpad2Key => Some('2'),
